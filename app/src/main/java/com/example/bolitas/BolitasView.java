@@ -46,6 +46,7 @@ public class BolitasView extends View {
         super.onSizeChanged(w, h, oldw, oldh);
         if (balls.isEmpty()) {
             controlBall = new Bola(w / 2.0, h / 2.0, 40, Color.BLACK, 0, 0);
+            controlBall.m = 1e20; //very high mass to prevent control ball to move
             balls.add(controlBall);
         }
     }
@@ -126,16 +127,16 @@ public class BolitasView extends View {
                 collision = true;
             }
         }
-        if(!collision){
+        if (!collision) {
             balls.add(nuevaBola);
         }
     }
 
     // Example implementations for the Bola class.
     public static class Bola {
-        private double x, y, r;
-        private int color;
-        private double dx, dy;
+        public double x, y, r, m;
+        public int color;
+        public double dx, dy;
 
         public Bola(double x, double y, double r, int color, double dx, double dy) {
             this.x = x;
@@ -144,6 +145,7 @@ public class BolitasView extends View {
             this.color = color;
             this.dx = dx;
             this.dy = dy;
+            this.m = Math.pow(r, 3); // Mass proportional to radius cubed
         }
 
         public RectF getBounds() {
@@ -175,24 +177,45 @@ public class BolitasView extends View {
         }
 
         public void resolveCollision(Bola other) {
-            // Basic Elastic Collision logic, feel free to expand upon this to make more realistic collisions.
-            // Swap speeds
-            double tempDx = this.dx;
-            double tempDy = this.dy;
-            this.dx = other.dx;
-            this.dy = other.dy;
-            other.dx = tempDx;
-            other.dy = tempDy;
-            // Adjust positions to avoid overlap
+            // 1. Calculate relative velocity and collision angle
+            double vx21 = other.dx - this.dx;
+            double vy21 = other.dy - this.dy;
+            double dx = other.x - this.x;
+            double dy = other.y - this.y;
+            double alpha = Math.atan2(dy, dx);
+            double cos = Math.cos(alpha);
+            double sin = Math.sin(alpha);
+
+            // 2. Rotate velocities to align with collision direction
+            double vx21t = cos * vx21 + sin * vy21;
+
+            // 3. Calculate new velocities along the collision direction
+            double m21 = other.m / this.m;
+            double dvx2 = -2 * vx21t / (1 + m21);
+            double newOtherDx = other.dx + dvx2 * cos;
+            double newThisDx = this.dx - m21 * dvx2 * cos;
+            double newOtherDy = other.dy + dvx2 * sin;
+            double newThisDy = this.dy - m21 * dvx2 * sin;
+
+            // 4. Rotate velocities back to original frame of reference
+
+            // 5. Apply new velocities
+            other.dx = newOtherDx;
+            other.dy = newOtherDy;
+            this.dx = newThisDx;
+            this.dy = newThisDy;
+
+
+            // 6. Adjust positions to avoid overlap
             double distance = Math.sqrt(Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2));
-            double overlap = (this.r + other.r - distance) / 2.0;
-            if (distance > 0) {
-                double dx = (this.x - other.x) / distance;
-                double dy = (this.y - other.y) / distance;
-                this.x += overlap * dx;
-                this.y += overlap * dy;
-                other.x -= overlap * dx;
-                other.y -= overlap * dy;
+            double overlap = (this.r + other.r - distance);
+            if (overlap > 0) {
+                double adjustmentX = overlap * (this.x - other.x) / distance;
+                double adjustmentY = overlap * (this.y - other.y) / distance;
+                this.x += adjustmentX;
+                this.y += adjustmentY;
+                other.x -= adjustmentX;
+                other.y -= adjustmentY;
             }
         }
     }
