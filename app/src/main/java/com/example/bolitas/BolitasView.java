@@ -3,6 +3,8 @@ package com.example.bolitas;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.LightingColorFilter;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
@@ -23,6 +25,9 @@ public class BolitasView extends View {
     private final Paint paint = new Paint(); // Initialize here and make it final
     private Bola controlBall;
     private Paint backgroundPaint; // Paint for the background gradient
+
+    // Fixed gradient for all balls (white to transparent)
+    private RadialGradient fixedBallGradient;
 
     public BolitasView(Context context) {
         super(context);
@@ -53,10 +58,17 @@ public class BolitasView extends View {
 
         // Set up the background gradient
         RadialGradient radialGradient = new RadialGradient(
-                w / 2f, h / 2f, Math.max(w, h) / 2f,
-                new int[]{Color.WHITE, Color.BLACK},
+                w / 10f, h / 10f, Math.max(w, h) / 1.5f,
+                new int[]{Color.WHITE, Color.DKGRAY},
                 null, Shader.TileMode.CLAMP);
         backgroundPaint.setShader(radialGradient);
+
+        // Set up the fixed ball gradient
+        fixedBallGradient = new RadialGradient(
+                0.5f, 0.5f, 2.0f, // Center and radius, we'll adjust the center when drawing
+                new int[]{Color.WHITE,  Color.DKGRAY}, // Adding an intermediate gray
+                null, // Adjusting positions for softer transition
+                Shader.TileMode.CLAMP);
 
         if (balls.isEmpty()) {
             controlBall = new Bola(w / 2.0, h / 2.0, 40, Color.BLACK, 0, 0);
@@ -87,37 +99,26 @@ public class BolitasView extends View {
 
     private void drawBalls(Canvas canvas) {
         for (Bola ball : balls) {
-            //Calculate the radial gradient based on the light source position
-            float relativeX = (float) ball.x / getWidth();
-            float relativeY = (float) ball.y / getHeight();
 
-            // Light source position (you can adjust these)
-            // Relative to width
-            float lightX = 0.3f;
-            float highlightX = (lightX + relativeX) / 2;
-            // Relative to height
-            float lightY = 0.3f;
-            float highlightY = (lightY + relativeY) / 2;
+            // Set the fixed gradient
+            fixedBallGradient.setLocalMatrix(ball.getMatrix()); //Adjust the center
+            paint.setShader(fixedBallGradient);
 
-            int[] colors = new int[2];
-            colors[0] = ball.getLightColor();
-            colors[1] = ball.getColor();
+            // Create a color filter to blend with the ball's color
+            ColorFilter filter = new LightingColorFilter(ball.getColor(), 0); // Multiply by the ball's color
 
-            float[] positions = new float[2];
-            positions[0] = highlightX;
-            positions[1] = (1 - highlightX) + highlightX;
+            // Apply the filter
+            paint.setColorFilter(filter);
 
-            RadialGradient radialGradient = new RadialGradient(
-                    (float) ball.x, (float) ball.y, (float) ball.r,
-                    colors, positions, Shader.TileMode.CLAMP);
-
-            paint.setShader(radialGradient);
-
+            // Draw the ball
             RectF oval = ball.getBounds();
             canvas.drawOval(oval, paint);
 
-            // Reset the shader to draw the next ball with a new gradient
+            // Reset the shader to draw the next ball
             paint.setShader(null);
+
+            // Reset the filter
+            paint.setColorFilter(null);
         }
     }
 
@@ -161,7 +162,7 @@ public class BolitasView extends View {
         double dx = random.nextDouble() * (random.nextBoolean() ? -2 : 2);
         double dy = random.nextDouble() * (random.nextBoolean() ? -2 : 2);
 
-        int color = Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256));
+        int color = Color.rgb(random.nextInt(256) , random.nextInt(256), random.nextInt(256));
         Bola nuevaBola = new Bola(x, y, r, color, dx, dy);
         boolean collision = false;
         for (Bola ball : balls) {
@@ -176,9 +177,13 @@ public class BolitasView extends View {
 
     // Example implementations for the Bola class.
     public static class Bola {
-        public double x, y, r, m;
-        public int color;
-        public double dx, dy;
+        private double x;
+        private double y;
+        private final double r;
+        private double m;
+        private final int color;
+        private double dx, dy;
+        private final android.graphics.Matrix matrix;
 
         public Bola(double x, double y, double r, int color, double dx, double dy) {
             this.x = x;
@@ -188,6 +193,7 @@ public class BolitasView extends View {
             this.dx = dx;
             this.dy = dy;
             this.m = Math.pow(r, 3); // Mass proportional to radius cubed
+            matrix = new android.graphics.Matrix(); // Initialize the matrix
         }
 
         public RectF getBounds() {
@@ -198,17 +204,11 @@ public class BolitasView extends View {
             return color;
         }
 
-        public int getLightColor() {
-            int red = ((color >> 16) & 0xFF);
-            int green = ((color >> 8) & 0xFF);
-            int blue = (color & 0xFF);
-
-            // Increase brightness (e.g., by 25%)
-            red = (int) Math.min(255, red * 1.25);
-            green = (int) Math.min(255, green * 1.25);
-            blue = (int) Math.min(255, blue * 1.25);
-
-            return Color.rgb(red, green, blue);
+        public android.graphics.Matrix getMatrix() {
+            matrix.reset();
+            matrix.preScale((float) r, (float) r);
+            matrix.preTranslate((float) (x / r) - 1, (float) (y / r) - 1);
+            return matrix;
         }
 
         public void move(int width, int height) {
