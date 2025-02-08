@@ -16,40 +16,55 @@ import android.view.View;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
 public class BolitasView extends View {
 
-    private List<Bola> balls; // Renamed to be more idiomatic
-    private final Paint paint = new Paint(); // Initialize here and make it final
+    //private static final String TAG = "BolitasView";
+
+    private final List<Bola> balls;
+    private final Paint ballPaint;
+    private final Paint backgroundPaint;
     private Bola controlBall;
-    private Paint backgroundPaint; // Paint for the background gradient
 
     // Fixed gradient for all balls (white to transparent)
     private RadialGradient fixedBallGradient;
 
+    // Constants for gradient parameters
+    private static final float BACKGROUND_GRADIENT_CENTER_X_RATIO = 0.1f;
+    private static final float BACKGROUND_GRADIENT_CENTER_Y_RATIO = 0.1f;
+    private static final float BACKGROUND_GRADIENT_RADIUS_RATIO = 1.5f;
+    private static final float FIXED_BALL_GRADIENT_CENTER_X = 0.5f;
+    private static final float FIXED_BALL_GRADIENT_CENTER_Y = 0.5f;
+    private static final float FIXED_BALL_GRADIENT_RADIUS = 3.0f;
+    private static final int CONTROL_BALL_INITIAL_RADIUS = 40;
+    private static final double CONTROL_BALL_MASS = 1e20;
+    private static final float BALL_SHRINK_FACTOR = 0.97f;
+
+    private final Random random;
+
     public BolitasView(Context context) {
-        super(context);
-        init();
+        this(context, null);
     }
 
     public BolitasView(Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);
-        init();
+        this(context, attrs, 0);
     }
 
     public BolitasView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        balls = new ArrayList<>();
+        ballPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        backgroundPaint = new Paint();
+        random = new Random();
         init();
     }
 
     private void init() {
-        paint.setAntiAlias(true);
-        balls = new ArrayList<>();
-
         // Initialize the background paint
-        backgroundPaint = new Paint();
+        backgroundPaint.setStyle(Paint.Style.FILL); // Ensure it fills the area
     }
 
     @Override
@@ -58,21 +73,22 @@ public class BolitasView extends View {
 
         // Set up the background gradient
         RadialGradient radialGradient = new RadialGradient(
-                w / 10f, h / 10f, Math.max(w, h) / 1.5f,
-                new int[]{Color.WHITE, Color.DKGRAY},
+                w * BACKGROUND_GRADIENT_CENTER_X_RATIO, h * BACKGROUND_GRADIENT_CENTER_Y_RATIO,
+                Math.max(w, h) / BACKGROUND_GRADIENT_RADIUS_RATIO,
+                new int[]{Color.WHITE, Color.BLACK},
                 null, Shader.TileMode.CLAMP);
         backgroundPaint.setShader(radialGradient);
 
         // Set up the fixed ball gradient
         fixedBallGradient = new RadialGradient(
-                0.5f, 0.5f, 2.0f, // Center and radius, we'll adjust the center when drawing
-                new int[]{Color.WHITE,  Color.DKGRAY}, // Adding an intermediate gray
-                null, // Adjusting positions for softer transition
+                FIXED_BALL_GRADIENT_CENTER_X, FIXED_BALL_GRADIENT_CENTER_Y, FIXED_BALL_GRADIENT_RADIUS,
+                new int[]{Color.WHITE, Color.DKGRAY, Color.BLACK}, // Adding an intermediate gray
+                new float[]{0f, 0.7f, 1f}, // Adjusting positions for softer transition
                 Shader.TileMode.CLAMP);
 
         if (balls.isEmpty()) {
-            controlBall = new Bola(w / 2.0, h / 2.0, 40, Color.BLACK, 0, 0);
-            controlBall.m = 1e20; //very high mass to prevent control ball to move
+            controlBall = createBall(w / 2.0, h / 2.0, CONTROL_BALL_INITIAL_RADIUS, Color.BLACK, 0, 0);
+            controlBall.setMass(CONTROL_BALL_MASS); //very high mass to prevent control ball to move
             balls.add(controlBall);
         }
     }
@@ -99,43 +115,63 @@ public class BolitasView extends View {
 
     private void drawBalls(Canvas canvas) {
         for (Bola ball : balls) {
+            // Only draw the ball if it's not marked for removal
+            if (!ball.isAbsorbed()) {
+                // Set the fixed gradient
+                fixedBallGradient.setLocalMatrix(ball.getMatrix()); //Adjust the center
+                ballPaint.setShader(fixedBallGradient);
 
-            // Set the fixed gradient
-            fixedBallGradient.setLocalMatrix(ball.getMatrix()); //Adjust the center
-            paint.setShader(fixedBallGradient);
+                // Create a color filter to blend with the ball's color
+                ColorFilter filter = new LightingColorFilter(ball.getColor(), 0); // Multiply by the ball's color
 
-            // Create a color filter to blend with the ball's color
-            ColorFilter filter = new LightingColorFilter(ball.getColor(), 0); // Multiply by the ball's color
+                // Apply the filter
+                ballPaint.setColorFilter(filter);
 
-            // Apply the filter
-            paint.setColorFilter(filter);
+                // Draw the ball
+                RectF oval = ball.getBounds();
+                canvas.drawOval(oval, ballPaint);
 
-            // Draw the ball
-            RectF oval = ball.getBounds();
-            canvas.drawOval(oval, paint);
+                // Reset the shader to draw the next ball
+                ballPaint.setShader(null);
 
-            // Reset the shader to draw the next ball
-            paint.setShader(null);
-
-            // Reset the filter
-            paint.setColorFilter(null);
+                // Reset the filter
+                ballPaint.setColorFilter(null);
+            }
         }
     }
 
     private void moveBalls() {
-        for (Bola ball : balls) {
-            ball.move(getWidth(), getHeight()); // use a better name for the method
+        Iterator<Bola> iterator = balls.iterator();
+        while (iterator.hasNext()) {
+            Bola ball = iterator.next();
+            if (ball.isAbsorbed()) {
+                ball.moveTowards(controlBall, BALL_SHRINK_FACTOR); // Move towards control ball if being absorbed
+                if (ball.getRadius() <= 0) {
+                    iterator.remove(); // Remove from the list if radius is zero or less
+                }
+            } else {
+                ball.move(getWidth(), getHeight());
+            }
         }
     }
 
+
     private void handleCollisions() {
-        for (int i = 0; i < balls.size(); i++) {
-            for (int j = i + 1; j < balls.size(); j++) {
-                Bola ball1 = balls.get(i);
+        // Make a copy of the list to avoid ConcurrentModificationException
+        List<Bola> ballsCopy = new ArrayList<>(balls);
+        for (Bola ball : ballsCopy) {
+            if (!ball.equals(controlBall) && controlBall.collisionDetect(ball)) {
+                ball.setAbsorbed(true); // Mark the ball as absorbed
+                // Match the velocity and move it to the control ball
+                ball.setVelocity(controlBall.getdx(),controlBall.getdy());
+                ball.setPosition(controlBall.getX(),controlBall.getY());
+            }
+            //No need to check against the control ball twice
+            for (int j = balls.indexOf(ball) + 1; j < balls.size(); j++) {
                 Bola ball2 = balls.get(j);
-                if (ball1.collisionDetect(ball2)) { // Modified to pass individual ball
+                if (ball.collisionDetect(ball2)) {
                     // Handle the collision here.
-                    ball1.resolveCollision(ball2);
+                    ball.resolveCollision(ball2);
                 }
             }
         }
@@ -144,134 +180,45 @@ public class BolitasView extends View {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_MOVE) {
-            controlBall.dx = (event.getX() - controlBall.x) / 20;
-            controlBall.dy = (event.getY() - controlBall.y) / 20;
-            controlBall.x = event.getX();
-            controlBall.y = event.getY();
+            controlBall.setVelocity(
+                    (event.getX() - controlBall.getX()) / 20,
+                    (event.getY() - controlBall.getY()) / 20
+            );
+            controlBall.setPosition(event.getX(), event.getY());
             return true;
         }
         return super.onTouchEvent(event);
     }
 
     public void addBall() {
-        Random random = new Random();
-        double r = 40 * (0.5 + random.nextDouble() * 1.5);
-        double x = r + random.nextDouble() * (getWidth() - 2 * r); // Ensure ball is fully within bounds
-        double y = r + random.nextDouble() * (getHeight() - 2 * r);
+        Bola newBall = createRandomBall();
+
+        // Check for collision before adding
+        if (!isCollidingWithExistingBalls(newBall)) {
+            balls.add(newBall);
+        }
+    }
+
+    private boolean isCollidingWithExistingBalls(Bola newBall) {
+        for (Bola ball : balls) {
+            if (newBall.collisionDetect(ball)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    private Bola createRandomBall() {
+        double radius = 40 * (0.5 + random.nextDouble() * 1.5);
+        double x = radius + random.nextDouble() * (getWidth() - 2 * radius); // Ensure ball is fully within bounds
+        double y = radius + random.nextDouble() * (getHeight() - 2 * radius);
 
         double dx = random.nextDouble() * (random.nextBoolean() ? -2 : 2);
         double dy = random.nextDouble() * (random.nextBoolean() ? -2 : 2);
 
-        int color = Color.rgb(random.nextInt(256) , random.nextInt(256), random.nextInt(256));
-        Bola nuevaBola = new Bola(x, y, r, color, dx, dy);
-        boolean collision = false;
-        for (Bola ball : balls) {
-            if (nuevaBola.collisionDetect(ball)) {
-                collision = true;
-            }
-        }
-        if (!collision) {
-            balls.add(nuevaBola);
-        }
+        int color = Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256));
+        return createBall(x, y, radius, color, dx, dy);
     }
-
-    // Example implementations for the Bola class.
-    public static class Bola {
-        private double x;
-        private double y;
-        private final double r;
-        private double m;
-        private final int color;
-        private double dx, dy;
-        private final android.graphics.Matrix matrix;
-
-        public Bola(double x, double y, double r, int color, double dx, double dy) {
-            this.x = x;
-            this.y = y;
-            this.r = r;
-            this.color = color;
-            this.dx = dx;
-            this.dy = dy;
-            this.m = Math.pow(r, 3); // Mass proportional to radius cubed
-            matrix = new android.graphics.Matrix(); // Initialize the matrix
-        }
-
-        public RectF getBounds() {
-            return new RectF((float) (x - r), (float) (y - r), (float) (x + r), (float) (y + r));
-        }
-
-        public int getColor() {
-            return color;
-        }
-
-        public android.graphics.Matrix getMatrix() {
-            matrix.reset();
-            matrix.preScale((float) r, (float) r);
-            matrix.preTranslate((float) (x / r) - 1, (float) (y / r) - 1);
-            return matrix;
-        }
-
-        public void move(int width, int height) {
-            x += dx;
-            y += dy;
-
-            // Check for boundaries
-
-            if (x - r < 0 || x + r > width) {
-                dx = -dx;
-                x = Math.max(r, Math.min(x, width - r)); // Prevent ball from getting stuck
-            }
-            if (y - r < 0 || y + r > height) {
-                dy = -dy;
-                y = Math.max(r, Math.min(y, height - r)); // Prevent ball from getting stuck
-            }
-        }
-
-        public boolean collisionDetect(Bola other) {
-            double distance = Math.sqrt(Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2));
-            return distance < this.r + other.r;
-        }
-
-        public void resolveCollision(Bola other) {
-            // 1. Calculate relative velocity and collision angle
-            double vx21 = other.dx - this.dx;
-            double vy21 = other.dy - this.dy;
-            double dx = other.x - this.x;
-            double dy = other.y - this.y;
-            double alpha = Math.atan2(dy, dx);
-            double cos = Math.cos(alpha);
-            double sin = Math.sin(alpha);
-
-            // 2. Rotate velocities to align with collision direction
-            double vx21t = cos * vx21 + sin * vy21;
-
-            // 3. Calculate new velocities along the collision direction
-            double m21 = other.m / this.m;
-            double dvx2 = -2 * vx21t / (1 + m21);
-            double newOtherDx = other.dx + dvx2 * cos;
-            double newThisDx = this.dx - m21 * dvx2 * cos;
-            double newOtherDy = other.dy + dvx2 * sin;
-            double newThisDy = this.dy - m21 * dvx2 * sin;
-
-            // 4. Rotate velocities back to original frame of reference
-
-            // 5. Apply new velocities
-            other.dx = newOtherDx;
-            other.dy = newOtherDy;
-            this.dx = newThisDx;
-            this.dy = newThisDy;
-
-            // 6. Adjust positions to avoid overlap
-            double distance = Math.sqrt(Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2));
-            double overlap = (this.r + other.r - distance);
-            if (overlap > 0) {
-                double adjustmentX = overlap * (this.x - other.x) / distance;
-                double adjustmentY = overlap * (this.y - other.y) / distance;
-                this.x += adjustmentX;
-                this.y += adjustmentY;
-                other.x -= adjustmentX;
-                other.y -= adjustmentY;
-            }
-        }
+    private Bola createBall(double x, double y, double radius, int color, double dx, double dy) {
+        return new Bola(x, y, radius, color, dx, dy);
     }
 }
