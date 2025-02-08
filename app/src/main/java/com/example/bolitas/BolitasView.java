@@ -41,7 +41,7 @@ public class BolitasView extends View {
     private static final float FIXED_BALL_GRADIENT_RADIUS = 3.0f;
     private static final int CONTROL_BALL_INITIAL_RADIUS = 40;
     private static final double CONTROL_BALL_MASS = 1e20;
-    private static final float BALL_SHRINK_FACTOR = 0.97f;
+    private static final float BALL_SHRINK_FACTOR = 0.99f;
 
     private final Random random;
 
@@ -75,7 +75,7 @@ public class BolitasView extends View {
         RadialGradient radialGradient = new RadialGradient(
                 w * BACKGROUND_GRADIENT_CENTER_X_RATIO, h * BACKGROUND_GRADIENT_CENTER_Y_RATIO,
                 Math.max(w, h) / BACKGROUND_GRADIENT_RADIUS_RATIO,
-                new int[]{Color.WHITE, Color.BLACK},
+                new int[]{Color.WHITE, Color.DKGRAY},
                 null, Shader.TileMode.CLAMP);
         backgroundPaint.setShader(radialGradient);
 
@@ -160,18 +160,22 @@ public class BolitasView extends View {
         // Make a copy of the list to avoid ConcurrentModificationException
         List<Bola> ballsCopy = new ArrayList<>(balls);
         for (Bola ball : ballsCopy) {
-            if (!ball.equals(controlBall) && controlBall.collisionDetect(ball)) {
-                ball.setAbsorbed(true); // Mark the ball as absorbed
-                // Match the velocity and move it to the control ball
-                ball.setVelocity(controlBall.getdx(),controlBall.getdy());
-                ball.setPosition(controlBall.getX(),controlBall.getY());
-            }
+//            if (!ball.equals(controlBall) && controlBall.collisionDetect(ball)) {
+//                ball.setAbsorbed(true); // Mark the ball as absorbed
+//                // Match the velocity and move it to the control ball
+//                ball.setVelocity(controlBall.getdx(),controlBall.getdy());
+//                ball.setPosition(controlBall.getX(),controlBall.getY());
+//            }
             //No need to check against the control ball twice
             for (int j = balls.indexOf(ball) + 1; j < balls.size(); j++) {
                 Bola ball2 = balls.get(j);
                 if (ball.collisionDetect(ball2)) {
-                    // Handle the collision here.
-                    ball.resolveCollision(ball2);
+                    if (ball.equals(controlBall)){
+                        ball2.setAbsorbed(true);
+                    } else {
+                        // Handle the collision here.
+                        ball.resolveCollision(ball2);
+                    }
                 }
             }
         }

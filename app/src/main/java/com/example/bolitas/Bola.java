@@ -79,8 +79,13 @@ public class Bola {
         if (!isAbsorbed) return; // Only move if being absorbed
 
         //Move the ball to the control ball
-        x = other.x;
-        y = other.y;
+//        x = other.x;
+//        y = other.y;
+        double alpha = Math.atan2((other.y - y) , (other.x - x));
+        x = other.x - (other.r + r) * Math.cos(alpha);
+        y = other.y - (other.r + r) * Math.sin(alpha);
+
+
         // Shrink the ball
         r *= shrinkFactor; // Decrease the radius
         if (r <=0) isAbsorbed=false;
