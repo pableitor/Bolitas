@@ -3,7 +3,6 @@ package com.example.bolitas;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
@@ -24,10 +23,6 @@ public class BolitasView extends View {
     private final Paint paint = new Paint(); // Initialize here and make it final
     private Bola controlBall;
     private Paint backgroundPaint; // Paint for the background gradient
-
-    // Light source position (you can adjust these)
-    private final float lightX = 0.3f; // Relative to width
-    private final float lightY = 0.3f; // Relative to height
 
     public BolitasView(Context context) {
         super(context);
@@ -96,7 +91,12 @@ public class BolitasView extends View {
             float relativeX = (float) ball.x / getWidth();
             float relativeY = (float) ball.y / getHeight();
 
+            // Light source position (you can adjust these)
+            // Relative to width
+            float lightX = 0.3f;
             float highlightX = (lightX + relativeX) / 2;
+            // Relative to height
+            float lightY = 0.3f;
             float highlightY = (lightY + relativeY) / 2;
 
             int[] colors = new int[2];
