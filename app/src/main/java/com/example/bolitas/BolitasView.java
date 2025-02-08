@@ -3,6 +3,7 @@ package com.example.bolitas;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
@@ -22,6 +23,7 @@ public class BolitasView extends View {
     private List<Bola> balls; // Renamed to be more idiomatic
     private final Paint paint = new Paint(); // Initialize here and make it final
     private Bola controlBall;
+    private Paint backgroundPaint; // Paint for the background gradient
 
     // Light source position (you can adjust these)
     private final float lightX = 0.3f; // Relative to width
@@ -45,11 +47,22 @@ public class BolitasView extends View {
     private void init() {
         paint.setAntiAlias(true);
         balls = new ArrayList<>();
+
+        // Initialize the background paint
+        backgroundPaint = new Paint();
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+
+        // Set up the background gradient
+        RadialGradient radialGradient = new RadialGradient(
+                w / 2f, h / 2f, Math.max(w, h) / 2f,
+                new int[]{Color.WHITE, Color.BLACK},
+                null, Shader.TileMode.CLAMP);
+        backgroundPaint.setShader(radialGradient);
+
         if (balls.isEmpty()) {
             controlBall = new Bola(w / 2.0, h / 2.0, 40, Color.BLACK, 0, 0);
             controlBall.m = 1e20; //very high mass to prevent control ball to move
@@ -61,8 +74,8 @@ public class BolitasView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas); // Call super.onDraw() first
 
-        // 1. Clear background only once per draw cycle.
-        canvas.drawColor(Color.YELLOW);
+        // 1. Clear background with gradient
+        canvas.drawRect(0, 0, getWidth(), getHeight(), backgroundPaint);
 
         // 2. Draw all balls
         drawBalls(canvas);
@@ -186,9 +199,9 @@ public class BolitasView extends View {
         }
 
         public int getLightColor() {
-            int red = (int) ((color >> 16) & 0xFF);
-            int green = (int) ((color >> 8) & 0xFF);
-            int blue = (int) (color & 0xFF);
+            int red = ((color >> 16) & 0xFF);
+            int green = ((color >> 8) & 0xFF);
+            int blue = (color & 0xFF);
 
             // Increase brightness (e.g., by 25%)
             red = (int) Math.min(255, red * 1.25);
@@ -203,6 +216,7 @@ public class BolitasView extends View {
             y += dy;
 
             // Check for boundaries
+
             if (x - r < 0 || x + r > width) {
                 dx = -dx;
                 x = Math.max(r, Math.min(x, width - r)); // Prevent ball from getting stuck
