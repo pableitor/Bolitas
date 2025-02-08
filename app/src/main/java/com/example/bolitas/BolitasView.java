@@ -4,7 +4,9 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.RadialGradient;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -20,6 +22,10 @@ public class BolitasView extends View {
     private List<Bola> balls; // Renamed to be more idiomatic
     private final Paint paint = new Paint(); // Initialize here and make it final
     private Bola controlBall;
+
+    // Light source position (you can adjust these)
+    private final float lightX = 0.3f; // Relative to width
+    private final float lightY = 0.3f; // Relative to height
 
     public BolitasView(Context context) {
         super(context);
@@ -73,9 +79,32 @@ public class BolitasView extends View {
 
     private void drawBalls(Canvas canvas) {
         for (Bola ball : balls) {
-            paint.setColor(ball.getColor()); // Use a getter for better encapsulation
-            RectF oval = ball.getBounds(); // Use a method to encapsulate calculations
+            //Calculate the radial gradient based on the light source position
+            float relativeX = (float) ball.x / getWidth();
+            float relativeY = (float) ball.y / getHeight();
+
+            float highlightX = (lightX + relativeX) / 2;
+            float highlightY = (lightY + relativeY) / 2;
+
+            int[] colors = new int[2];
+            colors[0] = ball.getLightColor();
+            colors[1] = ball.getColor();
+
+            float[] positions = new float[2];
+            positions[0] = highlightX;
+            positions[1] = (1 - highlightX) + highlightX;
+
+            RadialGradient radialGradient = new RadialGradient(
+                    (float) ball.x, (float) ball.y, (float) ball.r,
+                    colors, positions, Shader.TileMode.CLAMP);
+
+            paint.setShader(radialGradient);
+
+            RectF oval = ball.getBounds();
             canvas.drawOval(oval, paint);
+
+            // Reset the shader to draw the next ball with a new gradient
+            paint.setShader(null);
         }
     }
 
@@ -156,6 +185,19 @@ public class BolitasView extends View {
             return color;
         }
 
+        public int getLightColor() {
+            int red = (int) ((color >> 16) & 0xFF);
+            int green = (int) ((color >> 8) & 0xFF);
+            int blue = (int) (color & 0xFF);
+
+            // Increase brightness (e.g., by 25%)
+            red = (int) Math.min(255, red * 1.25);
+            green = (int) Math.min(255, green * 1.25);
+            blue = (int) Math.min(255, blue * 1.25);
+
+            return Color.rgb(red, green, blue);
+        }
+
         public void move(int width, int height) {
             x += dx;
             y += dy;
@@ -204,7 +246,6 @@ public class BolitasView extends View {
             other.dy = newOtherDy;
             this.dx = newThisDx;
             this.dy = newThisDy;
-
 
             // 6. Adjust positions to avoid overlap
             double distance = Math.sqrt(Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2));
