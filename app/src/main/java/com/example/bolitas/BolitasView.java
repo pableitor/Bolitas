@@ -22,7 +22,7 @@ import java.util.Random;
 
 public class BolitasView extends View {
 
-    //private static final String TAG = "BolitasView";
+    private static final String TAG = "BolitasView";
 
     private final List<Bola> balls;
     private final Paint ballPaint;
@@ -41,9 +41,12 @@ public class BolitasView extends View {
     private static final float FIXED_BALL_GRADIENT_RADIUS = 3.0f;
     private static final int CONTROL_BALL_INITIAL_RADIUS = 40;
     private static final double CONTROL_BALL_MASS = 1e20;
-    private static final float BALL_SHRINK_FACTOR = 0.99f;
+    private static final float BALL_SHRINK_FACTOR = 0.9f;
 
     private final Random random;
+    // Paint for drawing text
+    private final Paint textPaint;
+    private int ballCount;
 
     public BolitasView(Context context) {
         this(context, null);
@@ -59,6 +62,11 @@ public class BolitasView extends View {
         ballPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         backgroundPaint = new Paint();
         random = new Random();
+        // Initialize the text paint
+        textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        textPaint.setColor(Color.WHITE);
+        textPaint.setTextSize(40); // Adjust the text size as needed
+        ballCount = 0;
         init();
     }
 
@@ -90,6 +98,7 @@ public class BolitasView extends View {
             controlBall = createBall(w / 2.0, h / 2.0, CONTROL_BALL_INITIAL_RADIUS, Color.BLACK, 0, 0);
             controlBall.setMass(CONTROL_BALL_MASS); //very high mass to prevent control ball to move
             balls.add(controlBall);
+            ballCount++;
         }
     }
 
@@ -109,14 +118,17 @@ public class BolitasView extends View {
         // 4. Check for and handle collisions.
         handleCollisions();
 
-        // 5. Schedule next redraw.
+        // 5. Draw the ball count text
+        drawBallCount(canvas);
+
+        // 6. Schedule next redraw.
         invalidate();
     }
 
     private void drawBalls(Canvas canvas) {
         for (Bola ball : balls) {
             // Only draw the ball if it's not marked for removal
-            if (!ball.isAbsorbed()) {
+            //if (!ball.isAbsorbed()) {
                 // Set the fixed gradient
                 fixedBallGradient.setLocalMatrix(ball.getMatrix()); //Adjust the center
                 ballPaint.setShader(fixedBallGradient);
@@ -136,7 +148,7 @@ public class BolitasView extends View {
 
                 // Reset the filter
                 ballPaint.setColorFilter(null);
-            }
+            //}
         }
     }
 
@@ -146,8 +158,9 @@ public class BolitasView extends View {
             Bola ball = iterator.next();
             if (ball.isAbsorbed()) {
                 ball.moveTowards(controlBall, BALL_SHRINK_FACTOR); // Move towards control ball if being absorbed
-                if (ball.getRadius() <= 0) {
+                if (ball.getRadius() <= 0.5) {
                     iterator.remove(); // Remove from the list if radius is zero or less
+                    ballCount--;
                 }
             } else {
                 ball.move(getWidth(), getHeight());
@@ -180,6 +193,14 @@ public class BolitasView extends View {
             }
         }
     }
+    private void drawBallCount(Canvas canvas) {
+        String text = ballCount + " Balls";
+        float textWidth = textPaint.measureText(text);
+        float x = (getWidth() - textWidth) / 2f; // Center horizontally
+        float y = getHeight() - textPaint.getTextSize() / 2; // Place near the bottom
+
+        canvas.drawText(text, x, y, textPaint);
+    }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -200,6 +221,7 @@ public class BolitasView extends View {
         // Check for collision before adding
         if (!isCollidingWithExistingBalls(newBall)) {
             balls.add(newBall);
+            ballCount++;
         }
     }
 
