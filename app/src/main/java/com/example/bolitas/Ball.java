@@ -59,12 +59,7 @@ public class Ball {
         this.dy = dy;
     }
 
-    public double getdx(){
-        return this.dx;
-    }
-    public double getdy(){
-        return this.dy;
-    }
+
     public double getRadius() {
         return radius;
     }
@@ -76,9 +71,7 @@ public class Ball {
     public void moveTowards(Ball other, float shrinkFactor) {
         if (!isAbsorbed) return; // Only move if being absorbed
 
-        //Move the ball to the control ball
-//        x = other.x;
-//        y = other.y;
+
         double alpha = Math.atan2((other.y - y) , (other.x - x));
         x = other.x - (other.radius + radius) * Math.cos(alpha);
         y = other.y - (other.radius + radius) * Math.sin(alpha);

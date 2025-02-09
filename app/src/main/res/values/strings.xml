@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Bolitas</string>
+    <string-array name="background_colors">
+        <item>White</item>
+        <item>Black</item>
+        <item>Red</item>
+        <item>Blue</item>
+    </string-array>
 </resources>

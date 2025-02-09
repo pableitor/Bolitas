@@ -1,6 +1,7 @@
 package com.example.bolitas;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
@@ -47,6 +48,10 @@ public class BallsView extends View {
     // Paint for drawing text
     private final Paint textPaint;
     private int ballCount;
+    private Context context; // Store the context here
+    private int backgroundColor;
+    private int maxSize;
+    private int minSize;
 
     public BallsView(Context context) {
         this(context, null);
@@ -58,6 +63,7 @@ public class BallsView extends View {
 
     public BallsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        this.context = context; // Store the context passed to the constructor
         balls = new ArrayList<>();
         ballPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         backgroundPaint = new Paint();
@@ -67,25 +73,27 @@ public class BallsView extends View {
         textPaint.setColor(Color.WHITE);
         textPaint.setTextSize(40); // Adjust the text size as needed
         ballCount = 0;
-        init();
+        init(); //now the call to
     }
 
     private void init() {
         // Initialize the background paint
         backgroundPaint.setStyle(Paint.Style.FILL); // Ensure it fills the area
+
+        //Get shared preferences
+        SharedPreferences sharedPreferences = context.getSharedPreferences("MySettings", Context.MODE_PRIVATE);
+        backgroundColor = sharedPreferences.getInt("backgroundColor", 0); // Default to first item (white)
+        maxSize = sharedPreferences.getInt("maxSize", 100); // Default to 100
+        minSize = sharedPreferences.getInt("minSize", 20); // Default to 20
+
+
+
     }
+
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-
-        // Set up the background gradient
-        RadialGradient radialGradient = new RadialGradient(
-                w * BACKGROUND_GRADIENT_CENTER_X_RATIO, h * BACKGROUND_GRADIENT_CENTER_Y_RATIO,
-                Math.max(w, h) / BACKGROUND_GRADIENT_RADIUS_RATIO,
-                new int[]{Color.WHITE, Color.BLACK},
-                null, Shader.TileMode.CLAMP);
-        backgroundPaint.setShader(radialGradient);
 
         // Set up the fixed ball gradient
         fixedBallGradient = new RadialGradient(
@@ -93,7 +101,7 @@ public class BallsView extends View {
                 new int[]{Color.WHITE, Color.DKGRAY, Color.BLACK}, // Adding an intermediate gray
                 new float[]{0f, 0.7f, 1f}, // Adjusting positions for softer transition
                 Shader.TileMode.CLAMP);
-
+        updateBackgroundColor(backgroundColor);
         if (balls.isEmpty()) {
             controlBall = createBall(w / 2.0, h / 2.0, CONTROL_BALL_INITIAL_RADIUS, Color.BLACK, 0, 0);
             controlBall.setMass(CONTROL_BALL_MASS); //very high mass to prevent control ball to move
@@ -101,6 +109,21 @@ public class BallsView extends View {
             ballCount++;
         }
     }
+
+    private void updateBackgroundColor(int backgroundColor) {
+        int[] colors = {Color.WHITE, Color.BLACK, Color.RED, Color.BLUE};
+        if (backgroundColor < 0 || backgroundColor >= colors.length)
+            backgroundColor = 0; //Validate value
+        int color = colors[backgroundColor];
+        // Set up the background gradient
+        RadialGradient radialGradient = new RadialGradient(
+                getWidth() * BACKGROUND_GRADIENT_CENTER_X_RATIO, getHeight() * BACKGROUND_GRADIENT_CENTER_Y_RATIO,
+                Math.max(getWidth(), getHeight()) / BACKGROUND_GRADIENT_RADIUS_RATIO,
+                new int[]{color, Color.BLACK},
+                null, Shader.TileMode.CLAMP);
+        backgroundPaint.setShader(radialGradient);
+    }
+
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -155,7 +178,7 @@ public class BallsView extends View {
             Ball ball = iterator.next();
             if (ball.isAbsorbed()) {
                 ball.moveTowards(controlBall, BALL_SHRINK_FACTOR); // Move towards control ball if being absorbed
-                if (ball.getRadius() <= 0) {
+                if (ball.getRadius() <= 1) {
                     iterator.remove(); // Remove from the list
                     ballCount--;
                 }
