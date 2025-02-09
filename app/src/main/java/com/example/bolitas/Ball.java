@@ -1,29 +1,28 @@
 package com.example.bolitas;
-
 import android.graphics.Matrix;
 import android.graphics.RectF;
 
-public class Bola {
-    private double x, y, r, m;
+public class Ball {
+    private double x, y, radius, mass;
     private final int color;
     private double dx, dy;
     private final Matrix matrix;
     private boolean isAbsorbed; // Flag to indicate if the ball is being absorbed
 
-    public Bola(double x, double y, double r, int color, double dx, double dy) {
+    public Ball(double x, double y, double radius, int color, double dx, double dy) {
         this.x = x;
         this.y = y;
-        this.r = r;
+        this.radius = radius;
         this.color = color;
         this.dx = dx;
         this.dy = dy;
-        this.m = Math.pow(r, 3); // Mass proportional to radius cubed
+        this.mass = Math.pow(radius, 3); // Mass proportional to radius cubed
         matrix = new Matrix(); // Initialize the matrix
         isAbsorbed = false; // Initially, the ball is not being absorbed
     }
 
     public RectF getBounds() {
-        return new RectF((float) (x - r), (float) (y - r), (float) (x + r), (float) (y + r));
+        return new RectF((float) (x - radius), (float) (y - radius), (float) (x + radius), (float) (y + radius));
     }
 
     public int getColor() {
@@ -32,8 +31,8 @@ public class Bola {
 
     public Matrix getMatrix() {
         matrix.reset();
-        matrix.preScale((float) r, (float) r);
-        matrix.preTranslate((float) (x / r) - 1, (float) (y / r) - 1);
+        matrix.preScale((float) radius, (float) radius);
+        matrix.preTranslate((float) (x / radius) - 1, (float) (y / radius) - 1);
         return matrix;
     }
 
@@ -44,23 +43,22 @@ public class Bola {
     public boolean isAbsorbed() {
         return isAbsorbed;
     }
-
-    public void setPosition(double x, double y) {
-        this.x = x;
-        this.y = y;
-    }
     public double getX(){
         return this.x;
     }
-
     public double getY(){
         return this.y;
+    }
+    public void setPosition(double x, double y) {
+        this.x = x;
+        this.y = y;
     }
 
     public void setVelocity(double dx, double dy) {
         this.dx = dx;
         this.dy = dy;
     }
+
     public double getdx(){
         return this.dx;
     }
@@ -68,27 +66,27 @@ public class Bola {
         return this.dy;
     }
     public double getRadius() {
-        return r;
+        return radius;
     }
     public void setMass(double mass){
-        this.m = mass;
+        this.mass = mass;
     }
 
 
-    public void moveTowards(Bola other, float shrinkFactor) {
+    public void moveTowards(Ball other, float shrinkFactor) {
         if (!isAbsorbed) return; // Only move if being absorbed
 
         //Move the ball to the control ball
 //        x = other.x;
 //        y = other.y;
         double alpha = Math.atan2((other.y - y) , (other.x - x));
-        x = other.x - (other.r + r) * Math.cos(alpha);
-        y = other.y - (other.r + r) * Math.sin(alpha);
+        x = other.x - (other.radius + radius) * Math.cos(alpha);
+        y = other.y - (other.radius + radius) * Math.sin(alpha);
 
 
         // Shrink the ball
-        r *= shrinkFactor; // Decrease the radius
-        if (r <=0) isAbsorbed=false;
+        radius *= shrinkFactor; // Decrease the radius
+        if (radius <=0) isAbsorbed=false;
     }
 
     public void move(int width, int height) {
@@ -98,22 +96,22 @@ public class Bola {
         y += dy;
 
         // Check for boundaries
-        if (x - r < 0 || x + r > width) {
+        if (x - radius < 0 || x + radius > width) {
             dx = -dx;
-            x = Math.max(r, Math.min(x, width - r)); // Prevent ball from getting stuck
+            x = Math.max(radius, Math.min(x, width - radius)); // Prevent ball from getting stuck
         }
-        if (y - r < 0 || y + r > height) {
+        if (y - radius < 0 || y + radius > height) {
             dy = -dy;
-            y = Math.max(r, Math.min(y, height - r)); // Prevent ball from getting stuck
+            y = Math.max(radius, Math.min(y, height - radius)); // Prevent ball from getting stuck
         }
     }
 
-    public boolean collisionDetect(Bola other) {
+    public boolean collisionDetect(Ball other) {
         double distance = Math.sqrt(Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2));
-        return distance < this.r + other.r;
+        return distance < this.radius + other.radius;
     }
 
-    public void resolveCollision(Bola other) {
+    public void resolveCollision(Ball other) {
         // 1. Calculate relative velocity and collision angle
         double vx21 = other.dx - this.dx;
         double vy21 = other.dy - this.dy;
@@ -127,7 +125,7 @@ public class Bola {
         double vx21t = cos * vx21 + sin * vy21;
 
         // 3. Calculate new velocities along the collision direction
-        double m21 = other.m / this.m;
+        double m21 = other.mass / this.mass;
         double dvx2 = -2 * vx21t / (1 + m21);
         double newOtherDx = other.dx + dvx2 * cos;
         double newThisDx = this.dx - m21 * dvx2 * cos;
@@ -144,7 +142,7 @@ public class Bola {
 
         // 6. Adjust positions to avoid overlap
         double distance = Math.sqrt(Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2));
-        double overlap = (this.r + other.r - distance);
+        double overlap = (this.radius + other.radius - distance);
         if (overlap > 0) {
             double adjustmentX = overlap * (this.x - other.x) / distance;
             double adjustmentY = overlap * (this.y - other.y) / distance;
@@ -154,5 +152,4 @@ public class Bola {
             other.y -= adjustmentY;
         }
     }
-
 }
